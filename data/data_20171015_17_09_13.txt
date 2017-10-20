@@ -1,0 +1,4 @@
+# wireless pH sensor data log
+# Date: 20171015_17_09_13
+# Temperature (℃), Voltage of RE (mV), Voltage of WE_Cl after TIA (mV), Voltage of WE_pH (mV), Free Cl Current (nA), pH Voltage (mV), Free Cl (ppm), pH Value
+# 

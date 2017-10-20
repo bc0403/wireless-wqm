@@ -8,6 +8,12 @@
 author: Hao Jin, Si Pan
 last edited: Sept. 1, 2017
 """
+# Oct. 20
+# change single-end to differential,
+#       ADC1, pin0-ph; pin1-1.5V; pin2-Cl, pin3-1.5V
+# chnage LSB of ADC1 from 0.1250 to 0.0625 mV
+# change feedbackResistor from 820k to 500k
+
 
 # === system modules ===
 import sys
@@ -34,8 +40,8 @@ from PyQt5.QtCore import (QCoreApplication, Qt, QTimer)
 import serial_comm as comm
 
 # === global variables ===
-feedbackResistor = 820.0e3 # 820 kohm
-lsbADC = 0.125 # LSB of ADC, 0.1250 mV
+feedbackResistor = 500.0e3 # 500 kohm
+lsbADC = 0.0625 # LSB of ADC, 0.1250 mV
 lsbCurrentCl = lsbADC/feedbackResistor*1e6 # nA
 samplingTime = 1000 # 1000 ms
 offsetCurrentCl = 109.6 # the offset current when there are no NaOCl, nA
@@ -222,11 +228,11 @@ class ApplicationWindow(QMainWindow):
         self.ph_label = QLabel('pH Value: ')
         self.cl_label = QLabel('free Cl, ppm:')
         self.temp_label = QLabel('Temperature, ℃: ')
-        self.refV_label = QLabel('Reference Voltage, mV: ')
+        # self.refV_label = QLabel('Reference Voltage, mV: ')
         self.ph_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self.cl_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self.temp_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self.refV_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        # self.refV_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
         # set bold font to labels
         myFont=QFont()
@@ -241,7 +247,7 @@ class ApplicationWindow(QMainWindow):
         self.ph_lcd = QLCDNumber(self)
         self.cl_lcd = QLCDNumber(self)
         self.temp_lcd = QLCDNumber(self)
-        self.refV_lcd = QLCDNumber(9, self)
+        # self.refV_lcd = QLCDNumber(9, self)
         # self.refV_lcd.setDigitCount(9)
 
         # get the palette
@@ -266,11 +272,11 @@ class ApplicationWindow(QMainWindow):
         self.temp_lcd.setPalette(temp_lcd_palette)
 
         # get the palette
-        refV_lcd_palette = self.refV_lcd.palette()
-        # foreground color
-        refV_lcd_palette.setColor(refV_lcd_palette.WindowText, QColor(0, 0, 0))
-        # set the palette
-        self.refV_lcd.setPalette(refV_lcd_palette)
+        # refV_lcd_palette = self.refV_lcd.palette()
+        # # foreground color
+        # refV_lcd_palette.setColor(refV_lcd_palette.WindowText, QColor(0, 0, 0))
+        # # set the palette
+        # self.refV_lcd.setPalette(refV_lcd_palette)
 
         grid = QGridLayout()
         grid.setSpacing(10)
@@ -285,8 +291,8 @@ class ApplicationWindow(QMainWindow):
         grid.addWidget(self.temp_label, 0, 6, 1, 1)
         grid.addWidget(self.temp_lcd, 0, 7, 3, 2)
 
-        grid.addWidget(self.refV_label, 0, 9, 1, 1)
-        grid.addWidget(self.refV_lcd, 0, 10, 3, 2)
+        # grid.addWidget(self.refV_label, 0, 9, 1, 1)
+        # grid.addWidget(self.refV_lcd, 0, 10, 3, 2)
 
         # grid.addWidget(humi_label, 4, 0, 1, 1)
         # grid.addWidget(self.humi_lcd, 4, 1, 3, 1)
@@ -446,9 +452,8 @@ class ApplicationWindow(QMainWindow):
         print("output waiting of serial port: " + str(self.ser.out_waiting))
         self.data = [float(val) for val in line.split()] # split data to float numbers
         # the data read from the serial port should be 4 float numbers, otherwise neglect it.
-        # the 4 float numbers are [0]-temperaure, [1]-reference voltage, [2]-voltage at cl electrode,
-        # [3]-voltage at pH electrode, respectively.
-        if(len(self.data) == 4):
+        # the 3 float numbers are [0]-temperaure, [1]-pH voltage (diff), [2]-Cl voltage (diff)
+        if(len(self.data) == 3):
             if(int(self.data[0]) > 0 & int(self.data[0]) < 50):
                 self.dataTemp = np.mean(self.temp_plot.y)
                 self.temp_lcd.display("%.2f" % self.dataTemp)
@@ -467,19 +472,19 @@ class ApplicationWindow(QMainWindow):
                 self.temp_full_plot.draw()
 
             # display the reference voltage
-            self.refV_lcd.display("%.4f" % self.data[1])
+            # self.refV_lcd.display("%.4f" % self.data[1])
 
             # the galvanic voltage of a pH probe is the voltage difference between the
             # pH electrode (self.data[3]) and reference electrode (self.data[1]).
             self.dataPH = self.evalPH()
             self.ph_lcd.display("%.2f" % self.dataPH)
-            self.ph_plot.y = np.append(self.ph_plot.y, float(self.data[3]-self.data[1]))
+            self.ph_plot.y = np.append(self.ph_plot.y, float(self.data[1]))
             self.ph_plot.y = np.delete(self.ph_plot.y, 0)
             self.ph_plot.li.set_ydata(self.ph_plot.y)
             self.ph_plot.axes.set_ylim(min(self.ph_plot.y)-lsbADC, max(self.ph_plot.y)+lsbADC)
             self.ph_plot.draw()
 
-            self.ph_full_plot.y = np.append(self.ph_full_plot.y, float(self.data[3]-self.data[1]))
+            self.ph_full_plot.y = np.append(self.ph_full_plot.y, float(self.data[1]))
             self.ph_full_plot.x = np.append(self.ph_full_plot.x, self.ph_full_plot.x[-1] + 1)
             self.ph_full_plot.li.set_ydata(self.ph_full_plot.y)
             self.ph_full_plot.li.set_xdata(self.ph_full_plot.x)
@@ -498,13 +503,13 @@ class ApplicationWindow(QMainWindow):
 
             self.dataCl = self.evalCl()
             self.cl_lcd.display("%.2f" % self.dataCl)
-            self.cl_plot.y = np.append(self.cl_plot.y, float((self.data[1]-self.data[2])/feedbackResistor*1e6)) # nA
+            self.cl_plot.y = np.append(self.cl_plot.y, float(self.data[2])) # nA
             self.cl_plot.y = np.delete(self.cl_plot.y, 0)
             self.cl_plot.li.set_ydata(self.cl_plot.y)
             self.cl_plot.axes.set_ylim(min(self.cl_plot.y)-lsbCurrentCl, max(self.cl_plot.y)+lsbCurrentCl)
             self.cl_plot.draw()
 
-            self.cl_full_plot.y = np.append(self.cl_full_plot.y, float((self.data[1]-self.data[2])/feedbackResistor*1e6)) # nA
+            self.cl_full_plot.y = np.append(self.cl_full_plot.y, float(self.data[2])) # nA
             self.cl_full_plot.x = np.append(self.cl_full_plot.x, self.cl_full_plot.x[-1] + 1)
             self.cl_full_plot.li.set_ydata(self.cl_full_plot.y)
             self.cl_full_plot.li.set_xdata(self.cl_full_plot.x)
@@ -516,13 +521,10 @@ class ApplicationWindow(QMainWindow):
             # save measured data to file
             with open(self.filename, 'a') as file_object:
                 file_object.write(str(self.data[0]) + "    " +
-                    str(self.data[1]) + "    " +
-                    str(self.data[2]) + "    " +
-                    str(self.data[3]) + "    " +
-                    str((self.data[1]-self.data[2])/feedbackResistor*1e6) + "    " + # Cl current, nA
-                    str(self.data[3] - self.data[1]) + "    " + # pH voltage, mV
-                    str(self.dataCl) + "    " + # free Cl, ppm
-                    str(self.dataPH) + "\n") # pH Value
+                    str(self.data[1]) + "    " + # pH voltage, mV
+                    str(self.data[2]/feedbackResistor*1e6) + "    " + # Cl current, nA
+                    str(self.dataPH) + "    " + # pH Value
+                    str(self.dataCl) + "\n") # free Cl, ppm
 
 
     def fileQuit(self):
@@ -583,13 +585,10 @@ Date: 2017.05.25
             file_object.write("# wireless pH sensor data log\n")
             file_object.write("# Date: " + self.time_stamp + "\n")
             file_object.write("# Temperature (℃)," +
-                " Voltage of RE (mV)," +
-                " Voltage of WE_Cl after TIA (mV)," +
-                " Voltage of WE_pH (mV)," +
+                " Voltage of pH, ref to RE (mV)," +
                 " Free Cl Current (nA)," +
-                " pH Voltage (mV)," +
-                " Free Cl (ppm)," +
-                " pH Value\n")
+                " pH Value," +
+                " Free Cl (ppm)\n")
             file_object.write("# \n")
 
     def disconnectButton(self):
